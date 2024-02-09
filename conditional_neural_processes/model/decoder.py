@@ -11,8 +11,8 @@ class DeterministicDecoder(nn.Module):
     """
 
     def __init__(self,
-                 x_size: int, 
-                 r_dim: int, 
+                 x_size: int,
+                 r_dim: int,
                  num_layers: int,
                  num_units: int,
                  y_size: int,
@@ -24,16 +24,17 @@ class DeterministicDecoder(nn.Module):
         self._r_dim = r_dim
         self._x_size = x_size
         self._in_dim = r_dim + x_size
-        
-        activation_func_dict = {'relu': F.relu, 'gelu': F.gelu, 'elu': F.elu}
-        self._activation_func = activation_func_dict[activation_cls]
-    
+
+        if not hasattr(nn, activation_cls):
+            raise ValueError(f"Invalid activation_cls: {activation_cls}")
+        self._activation_cls = activation_cls
+        self._activation = getattr(nn, activation_cls)()
+
         self._layer_sizes = [
             self._in_dim, *(num_units for _ in range(num_layers)), 2*y_size]
         self._linear = nn.ModuleList(
             nn.Linear(i, o) for i, o in zip(self._layer_sizes[:-1], self._layer_sizes[1:])
         )
-
 
     def forward(self, representation: torch.tensor, target_x: torch.tensor):
         """decodes the targets.
@@ -48,40 +49,45 @@ class DeterministicDecoder(nn.Module):
             std of shape (batch_size, num_target, y_size): the standard deviation of conditional distribution. 
             NOTE std should be bounded as non-negative.
             """
+        if len(representation.shape) != 2:
+            raise ValueError('Invalid `representation` shape.')
+        if len(target_x.shape) != 3:
+            raise ValueError('Invalid `target_x` shape.')
+
         _, r_dim = representation.shape
         batch_size, num_target, x_size = target_x.shape
-        
+
         if x_size != self._x_size:
             raise ValueError('Invalid `target_x` size.')
         if r_dim != self._r_dim:
-            raise ValueErorr('Invalid `representation` size.')
+            raise ValueError('Invalid `representation` size.')
 
         # parallelism on all the context points
-        representation = torch.tile(
-            representation[:, None, :], [1, num_target, 1]
-        )  # (batch_size, num_target, r_dim)
-        
+        representation = representation.unsqueeze(1).repeat(1, num_target, 1)
+
         phi = torch.cat((target_x, representation), dim=-1)
-        phi = phi.view(batch_size*num_target, -1) # (batch_size*num_target, r_dim+x_size)
+        # (batch_size*num_target, r_dim+x_size)
+        phi = phi.view(batch_size*num_target, -1)
         for idx, l in enumerate(self._linear):
             phi = l(phi)
             if idx < len(self._linear) - 1:
-                phi = self._activation_func(phi)
+                phi = self._activation(phi)
 
         mean, log_std = phi[:, :self._y_size], phi[:,
-                                                      self._y_size:]  # (batch_size*num_target, y_size)
-        
-        # NOTE bound the standard deviation.
+                                                   self._y_size:]  # (batch_size*num_target, y_size)
+        # NOTE bound the standard deviation as non-negative
         # method 1: softplus
-        std = 0.1 + 0.9 * F.softplus(log_std)
-        # method 2: exp. NOTE explode. 
+        std = 0.1 + 0.9 * F.softplus(log_std) # softplus can still technically return zero, so we add a small constant
+        # method 2: exp. NOTE explode.
         # std = torch.exp(log_std)
-        
-        # bring back size 
-        mean, std = mean.view(batch_size, num_target, -1), std.view(batch_size, num_target, -1)
-    
+
+        # bring back size
+        mean, std = mean.view(batch_size, num_target, -
+                              1), std.view(batch_size, num_target, -1)
+
         # NOTE equivalent to `tf.contrib.distributions.MultivariateNormalDiag(loc=mu, scale_diag=sigma)`
         # dist = Independent(Normal(loc=mean, scale=std), 1)
-        dist = MultivariateNormal(loc=mean, scale_tril=torch.diag_embed(std, dim1=2, dim2=3))
+        dist = MultivariateNormal(
+            loc=mean, scale_tril=torch.diag_embed(std, dim1=2, dim2=3))
         # print(dist.batch_shape,dist.event_shape)
         return dist, mean, std

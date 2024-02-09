@@ -26,12 +26,11 @@ def plot_functions(context_x: torch.tensor, context_y: torch.tensor, target_x: t
       interpolate=True)
 
     # Make the plot pretty
-    # plt.yticks([-2, 0, 2], fontsize=16)
-    # plt.xticks([-2, 0, 2], fontsize=16)
-    # plt.ylim([-2, 2])
+    plt.yticks([-2, 0, 2], fontsize=16)
+    plt.xticks([-2, 0, 2], fontsize=16)
+    plt.ylim([-2, 2])
     plt.grid('off')
     ax = plt.gca()
-    # ax.set_axis_bgcolor('white')
     plt.show()
      
     

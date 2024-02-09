@@ -58,12 +58,12 @@ class DeterministicCNP(nn.Module):
         """Returns the predicted mean and variance at the target points.
 
         Args:
-            query: Array containing ((context_x, context_y), target_x) where:
-            context_x: Array of shape batch_size x num_context x 1 contains the x values of the context points.
-            context_y: Array of shape batch_size x num_context x 1 contains the y values of the context points.
-            target_x: Array of shape batch_size x num_target x 1 contains the x values of the target points.
-            target_y: The ground truth y values of the target y. An array of shape batchsize x num_targets x 1.
-            num_total_points: Number of target points.
+            query: A tuple of (context_X, context_y, target_X) where:
+                context_x: Array of shape batch_size x num_context x 1 contains the x values of the context points.
+                context_y: Array of shape batch_size x num_context x 1 contains the y values of the context points.
+                target_x: Array of shape batch_size x num_target x 1 contains the x values of the target points.
+                target_y: The ground truth y values of the target y. An array of shape batch_size x num_targets x 1.
+                num_total_points: Number of target points.
 
         Returns:
             log_p of shape (batch_size, num_target): The log_probability of the target_y given the predicted distribution.
@@ -74,7 +74,6 @@ class DeterministicCNP(nn.Module):
 
         representation = self._encoder(context_X, context_y)
         dist, mu, sigma = self._decoder(representation, target_X)
-
         # when training
         if target_y is not None:
             log_p = dist.log_prob(target_y)

@@ -7,18 +7,19 @@ dataset:
     batch_size: 64
     
 encoder:
-    num_layers: 2
+    num_layers: 4
     num_units: 128
-    activation_cls: 'relu'
+    activation_cls: 'ReLU'
 
 r_dim: 128
 
 decoder:
     num_layers: 2
     num_units: 128
-    activation_cls: 'relu'
+    activation_cls: 'ReLU'
     
-    
-lr: 1e-3
-decay_rate: 0
-num_epochs: 200000
+training: 
+    lr: 1e-3
+    decay_rate: 0
+    num_epochs: 200000
+    log_frequency: 5000

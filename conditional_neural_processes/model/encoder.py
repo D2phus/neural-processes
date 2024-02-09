@@ -21,9 +21,11 @@ class DeterministicEncoder(nn.Module):
         self._y_size = y_size
         self._in_dim = x_size + y_size
         
-        activation_func_dict = {'relu': F.relu, 'gelu': F.gelu, 'elu': F.elu}
-        self._activation_func = activation_func_dict[activation_cls]
-        
+        if not hasattr(nn, activation_cls):
+            raise ValueError(f"Invalid activation_cls: {activation_cls}")
+        self._activation_cls = activation_cls
+        self._activation = getattr(nn, activation_cls)()
+
         self._layer_sizes = [self._in_dim, *(num_units for _ in range(num_layers)), r_dim]
         self._linear = nn.ModuleList(
             nn.Linear(i, o) for i, o in zip(self._layer_sizes[:-1], self._layer_sizes[1:]))
@@ -41,7 +43,7 @@ class DeterministicEncoder(nn.Module):
         return representation.mean(dim=1)
         # return representation.view(-1, self._r_dim).mean(dim=0)
 
-    def forward(self, context_X, context_y):
+    def forward(self, context_X: torch.Tensor, context_y: torch.Tensor)-> torch.Tensor:
         """Encodes the inputs into one representation.
 
         Args: 
@@ -52,8 +54,13 @@ class DeterministicEncoder(nn.Module):
             representation of shape (batch_size, representation_size)
             # global_representation of shape (r_dim)
         """
+        if len(context_X.shape) != 3:
+            raise ValueError('Invalid `context_X` shape.')
+        if len(context_y.shape) != 3:
+            raise ValueError('Invalid `context_y` shape.')
+        
         context = torch.cat((context_X, context_y), dim=-1)
-        batch_size, _, in_dim = context.shape
+        _, _, in_dim = context.shape
         if in_dim != self._in_dim: 
             raise ValueError('Invalid context size.')
         
@@ -62,6 +69,6 @@ class DeterministicEncoder(nn.Module):
         for idx, l in enumerate(self._linear):
             representation = l(representation)
             if idx < len(self._linear) - 1:
-                representation = self._activation_func(representation)
+                representation = self._activation(representation)
 
         return self.aggregate(representation)
