@@ -23,6 +23,7 @@ def train(config,
         lr: learning rate
         decay_rate: weight decay
     """
+
     lr = config.training.lr
     decay_rate = config.training.decay_rate
     num_epochs = config.training.num_epochs

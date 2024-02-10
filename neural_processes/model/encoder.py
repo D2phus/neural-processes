@@ -5,7 +5,7 @@ import torch.nn.functional as F
 from typing import List
 
 
-class DeterministicEncoder(nn.Module):
+class MeanAggregateEncoder(nn.Module):
     def __init__(self,
                  x_size: int, 
                  y_size: int, 
@@ -13,7 +13,15 @@ class DeterministicEncoder(nn.Module):
                  num_layers: int,
                  num_units: int, 
                  activation_cls: str = 'ReLU'):
-        """The encoder. 
+        """The encoder for latent neural processes. Same as the encoder for deterministic CNP, where mean of the representation is taken as the global representation.
+        
+        Args:
+            x_size: the dimension of the input x.
+            y_size: the dimension of the input y.
+            r_dim: the dimension of the representation.
+            num_layers: the number of layers in the MLP.
+            num_units: the number of units in each hidden layer.
+            activation_cls: the activation function.
         """
         super().__init__()
         self._r_dim = r_dim
