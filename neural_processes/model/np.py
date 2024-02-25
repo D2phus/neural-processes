@@ -1,5 +1,5 @@
 from .decoder import LatentDecoder
-from .encoder import MeanAggregateEncoder
+from .encoder import Encoder
 from .aggregator import Aggregator
 
 import torch
@@ -41,6 +41,13 @@ class LatentNP(nn.Module):
             r_dim: the dimension of the representation.
             x_size: the dimension of the input x.
             y_size: the dimension of the input y.
+        
+        Returns:
+            mu: the mean of the predicted distribution.
+            sigma: the standard deviation of the predicted distribution.
+            log_p: the log probability of the target y.
+            kl: the kl divergence between the prior and the posterior.
+            loss: the loss of the model.
         """
         super().__init__()
         self._encoder_num_layers = encoder_num_layers
@@ -53,12 +60,12 @@ class LatentNP(nn.Module):
         self._y_size = y_size
         self._x_size = x_size
 
-        self._encoder = MeanAggregateEncoder(x_size=self._x_size,
-                                      y_size=self._y_size,
-                                      r_dim=self._r_dim,
-                                      num_layers=self._encoder_num_layers,
-                                      num_units=self._encoder_num_units,
-                                      activation_cls=self._encoder_activation_cls)
+        self._encoder = Encoder(x_size=self._x_size,
+                                             y_size=self._y_size,
+                                             r_dim=self._r_dim,
+                                             num_layers=self._encoder_num_layers,
+                                             num_units=self._encoder_num_units,
+                                             activation_cls=self._encoder_activation_cls)
         self._aggregator = Aggregator(r_dim=self._r_dim,
                                       num_layers=agggreagtor_num_layers,
                                       num_units=agggreagtor_num_units,
@@ -72,19 +79,27 @@ class LatentNP(nn.Module):
 
     def forward(self, query, num_total_points, num_contexts, target_y=None):
         (context_X, context_y), target_X = query
-
-        representation = self._encoder(context_X, context_y)
+        context_r = self._encoder(context_X, context_y)
         # aggregate the representation
-        latent_dist, z_mu, z_sigma = self._aggregator(representation)
+        prior_latent_dist, _, _ = self._aggregator(context_r) # conditional latent prior, of shape (batch_size, r_dim)
         # sample from the latent distribution
-        representation = latent_dist.rsample()
+        representation = prior_latent_dist.rsample()
         # representation = latent_dist.sample() # NOTE we cannot backpropagate since the computational graph is disconnected!
         dist, mu, sigma = self._decoder(representation, target_X)
         # when training
         if target_y is not None:
-            log_p = dist.log_prob(target_y)
+            # TODO: check the variational lower bound and elbo. 
+            log_p = dist.log_prob(target_y) # log conditional density of shape (batch_size, num_targets)
+            
+            target_r = self._encoder(target_X, target_y)
+            posterior_latent_dist, _, _ = self._aggregator(target_r) # conditional latent posterior, of shape (batch_size, r_dim)
+            # kl divergence between conditional latent prior and posterior, of shape (batch_size, r_dim)
+            kl = torch.distributions.kl.kl_divergence(p=posterior_latent_dist, q=prior_latent_dist).sum(dim=-1) # NOTE sum along r_dim, of shape (batch_size)
+            loss = -torch.mean(log_p.sum(dim=-1) - kl) # elbo, average over batch_size
         # when testing
         else:
             log_p = None
+            kl = None
+            loss = None
 
-        return log_p, mu, sigma
+        return mu, sigma, log_p, kl, loss

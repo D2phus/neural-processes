@@ -6,9 +6,12 @@ from torch.distributions import Normal
 
 class Aggregator(nn.Module):
     def __init__(self, r_dim: int, num_layers: int, num_units: int, activation_cls: str = 'ReLU'):
-        """The aggregator for the latent neural processes.
+        """The aggregator for the latent neural processes. MLP is used. 
 
         Args:
+            num_layers: the number of layers in the aggregator.
+            num_units: the number of units in each hidden layer of the aggregator.
+            activation_cls: the activation function of the aggregator.
             r_dim: the dimension of the representation.
         """
         super().__init__()
@@ -27,7 +30,7 @@ class Aggregator(nn.Module):
 
 
     def forward(self, representation: torch.tensor) -> torch.tensor:
-        """infers the latent distribution from the representation.
+        """models the latent distribution from the representation.
 
         Args: 
             representation of shape (batch_size, r_dim)

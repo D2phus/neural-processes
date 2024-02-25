@@ -81,7 +81,7 @@ class LatentDecoder(nn.Module):
         # NOTE bound the standard deviation as non-negative
         std = 0.1 + 0.9 * F.softplus(log_std)
 
-        # bring back size
+        # bring back size to (batch_size, num_target, y_size)
         mean, std = mean.view(batch_size, num_target, -
                               1), std.view(batch_size, num_target, -1)
 

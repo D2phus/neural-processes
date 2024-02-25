@@ -30,7 +30,7 @@ class DeterministicEncoder(nn.Module):
         self._linear = nn.ModuleList(
             nn.Linear(i, o) for i, o in zip(self._layer_sizes[:-1], self._layer_sizes[1:]))
 
-    def aggregate(self, representation: torch.tensor) -> torch.tensor:
+    def _aggregate(self, representation: torch.tensor) -> torch.tensor:
         """permutation-invariant aggregator. 
 
         Args: 

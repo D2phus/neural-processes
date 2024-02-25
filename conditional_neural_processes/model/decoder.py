@@ -9,7 +9,6 @@ from torch.distributions.independent import Independent
 class DeterministicDecoder(nn.Module):
     """The decoder.
     """
-
     def __init__(self,
                  x_size: int,
                  r_dim: int,
